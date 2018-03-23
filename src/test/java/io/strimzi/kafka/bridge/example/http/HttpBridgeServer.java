@@ -1,7 +1,5 @@
 package io.strimzi.kafka.bridge.example.http;
 
-import io.strimzi.kafka.bridge.amqp.AmqpBridge;
-import io.strimzi.kafka.bridge.amqp.AmqpBridgeConfigProperties;
 import io.strimzi.kafka.bridge.http.HttpBridge;
 import io.vertx.core.Vertx;
 
