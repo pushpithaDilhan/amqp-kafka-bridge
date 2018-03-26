@@ -1,6 +1,5 @@
 package io.strimzi.kafka.bridge.http;
 
-import io.strimzi.kafka.bridge.SinkBridgeEndpoint;
 import io.strimzi.kafka.bridge.config.KafkaConfigProperties;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Future;
@@ -10,14 +9,10 @@ import io.vertx.core.http.HttpServer;
 import io.vertx.core.http.HttpServerOptions;
 import io.vertx.core.http.HttpServerResponse;
 import io.vertx.core.json.JsonObject;
-import io.vertx.kafka.client.common.TopicPartition;
 import io.vertx.kafka.client.consumer.KafkaConsumer;
-import io.vertx.kafka.client.consumer.KafkaConsumerRecords;
 import io.vertx.kafka.client.producer.KafkaProducer;
 import io.vertx.kafka.client.producer.KafkaProducerRecord;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
-import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.clients.producer.ProducerConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
