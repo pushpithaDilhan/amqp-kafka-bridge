@@ -22,7 +22,9 @@ public class HttpDefaultMessageConverter implements MessageConverter<String, byt
                 rec.put("offset", record.offset());
                 rec.put("value", new String(record.value()));
                 rec.put("partition", record.partition());
-                Buffer buffer = rec.toBuffer();
+                JsonObject body = new JsonObject();
+                body.put("record",rec);
+                Buffer buffer = body.toBuffer();
                 return buffer;
         }
 }
