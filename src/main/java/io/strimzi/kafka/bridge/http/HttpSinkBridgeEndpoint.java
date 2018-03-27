@@ -4,9 +4,8 @@ import io.strimzi.kafka.bridge.Endpoint;
 import io.strimzi.kafka.bridge.SinkBridgeEndpoint;
 import io.strimzi.kafka.bridge.config.BridgeConfigProperties;
 import io.vertx.core.Vertx;
-import io.vertx.core.http.HttpServerRequest;
 
-public class HttpSinkBridgeEndpoint extends SinkBridgeEndpoint<K, V>{
+public class HttpSinkBridgeEndpoint<K, V> extends SinkBridgeEndpoint<K, V>{
 
         /**
          * Constructor
