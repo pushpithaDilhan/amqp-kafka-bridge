@@ -3,13 +3,19 @@ package io.strimzi.kafka.bridge.http;
 import io.strimzi.kafka.bridge.Endpoint;
 import io.strimzi.kafka.bridge.SourceBridgeEndpoint;
 import io.strimzi.kafka.bridge.config.BridgeConfigProperties;
+import io.strimzi.kafka.bridge.converter.MessageConverter;
+import io.strimzi.kafka.bridge.http.converter.HttpDefaultMessageConverter;
 import io.vertx.core.Vertx;
+import io.vertx.core.buffer.Buffer;
 import io.vertx.core.http.HttpServerRequest;
 import io.vertx.core.http.HttpServerResponse;
 import io.vertx.core.json.JsonObject;
 import io.vertx.kafka.client.producer.KafkaProducerRecord;
 
 public class HttpSourceBridgeEndpoint extends SourceBridgeEndpoint{
+
+        // converter from HTTP message to ProducerRecord
+        private MessageConverter<String, byte[], Buffer> converter;
 
         /**
          * Constructor
@@ -25,17 +31,21 @@ public class HttpSourceBridgeEndpoint extends SourceBridgeEndpoint{
         public void handle(Endpoint<?> endpoint) {
                 HttpServerRequest request = (HttpServerRequest) endpoint.get();
 
+                if (this.converter == null) {
+                        this.converter = (MessageConverter<String, byte[], Buffer>) new HttpDefaultMessageConverter();
+                }
+
                 request.bodyHandler(buffer -> {
                         // message conversion HTTP -> Kafka Producer Record
                         JsonObject body = buffer.toJsonObject();
                         String topic = body.getString("topic");
-                        byte[] value = body.getString("message").getBytes();
-                        KafkaProducerRecord<String, byte[]> record = KafkaProducerRecord.create(topic,null, value,0);
+
+                        KafkaProducerRecord<String, byte[]> record = this.converter.toKafkaRecord(topic, buffer);
 
                         // message settled (by sender), no feedback need by Apache Kafka, no disposition to be sent
                         this.send(record, null);
 
-                        log.info("Message delivered to topic {} with value {}", topic, value);
+                        log.info("Message delivered to topic {}", topic);
 
                         // create the response
                         String message = "Message delivered";

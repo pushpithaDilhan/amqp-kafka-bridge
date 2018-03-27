@@ -4,11 +4,12 @@ import io.strimzi.kafka.bridge.Endpoint;
 import io.strimzi.kafka.bridge.SinkBridgeEndpoint;
 import io.strimzi.kafka.bridge.config.BridgeConfigProperties;
 import io.strimzi.kafka.bridge.config.KafkaConfigProperties;
+import io.strimzi.kafka.bridge.converter.MessageConverter;
+import io.strimzi.kafka.bridge.http.converter.HttpDefaultMessageConverter;
 import io.vertx.core.Vertx;
 import io.vertx.core.buffer.Buffer;
 import io.vertx.core.http.HttpServerRequest;
 import io.vertx.core.http.HttpServerResponse;
-import io.vertx.core.json.JsonObject;
 import io.vertx.kafka.client.consumer.KafkaConsumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 
@@ -21,6 +22,9 @@ public class HttpSinkBridgeEndpoint<K, V> extends SinkBridgeEndpoint<K, V>{
 
         private KafkaConsumer<String, byte[]> consumer;
         private KafkaConfigProperties kafkaConfigProperties;
+
+        // converter from KafkaConsumerRecord to HTTP message
+        private MessageConverter<String, byte[], Buffer> converter;
 
         /**
          * Constructor
@@ -47,21 +51,16 @@ public class HttpSinkBridgeEndpoint<K, V> extends SinkBridgeEndpoint<K, V>{
                 // subscribe to several topics
                 Set<String> topics = new HashSet<String>(Arrays.asList(topics_query.split(" : ")));
 
+                if (this.converter == null) {
+                        this.converter = (MessageConverter<String, byte[], Buffer>) new HttpDefaultMessageConverter();
+                }
+
                 InitConsumer();
 
                 this.consumer.subscribe(topics);
 
-                JsonObject body = new JsonObject();
-
                 this.consumer.handler(record ->{
-                        // convert kafka record to HTTP message
-                        JsonObject rec = new JsonObject();
-                        rec.put("key", record.key());
-                        rec.put("offset", record.offset());
-                        rec.put("value", new String(record.value()));
-                        rec.put("partition", record.partition());
-                        body.put("record",rec);
-                        Buffer buffer = body.toBuffer();
+                        Buffer buffer = this.converter.toMessage(null, record);
                         sendResponse(request, buffer);
                 });
 
