@@ -52,7 +52,7 @@ public class HttpSinkBridgeEndpoint<K, V> extends SinkBridgeEndpoint<K, V>{
                 Set<String> topics = new HashSet<String>(Arrays.asList(topics_query.split(" : ")));
 
                 if (this.converter == null) {
-                        this.converter = (MessageConverter<String, byte[], Buffer>) new HttpDefaultMessageConverter();
+                        this.converter = new HttpDefaultMessageConverter();
                 }
 
                 InitConsumer();

@@ -5,7 +5,6 @@ import io.vertx.core.Future;
 import io.vertx.core.http.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 
 public class HttpBridge extends AbstractVerticle {
 
@@ -13,12 +12,6 @@ public class HttpBridge extends AbstractVerticle {
 
         private HttpServer server;
         private HttpBridgeConfigProperties bridgeConfigProperties;
-
-
-        @Autowired
-        public void setBridgeConfigProperties(HttpBridgeConfigProperties bridgeConfigProperties) {
-                this.bridgeConfigProperties = bridgeConfigProperties;
-        }
 
         /**
         * Start the Http server
@@ -47,6 +40,7 @@ public class HttpBridge extends AbstractVerticle {
 
                 log.info("Starting HTTP-Kafka bridge verticle...");
 
+                this.bridgeConfigProperties = new HttpBridgeConfigProperties();
                 HttpMode mode = this.bridgeConfigProperties.getEndpointConfigProperties().getMode();
                 log.info("HTTP-Kafka Bridge configured in {} mode", mode);
                 if (mode.equals(HttpMode.SERVER)) {
