@@ -1,19 +1,11 @@
 package io.strimzi.kafka.bridge.http;
 
-import io.strimzi.kafka.bridge.config.KafkaConfigProperties;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Future;
-import io.vertx.core.buffer.Buffer;
 import io.vertx.core.http.*;
-import io.vertx.core.json.JsonObject;
-import io.vertx.kafka.client.consumer.KafkaConsumer;
-import io.vertx.kafka.client.producer.KafkaProducer;
-import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-
-import java.util.*;
 
 public class    HttpBridge extends AbstractVerticle {
 
@@ -21,9 +13,7 @@ public class    HttpBridge extends AbstractVerticle {
 
         private HttpServer server;
         private HttpBridgeConfigProperties bridgeConfigProperties;
-        private KafkaConfigProperties kafkaConfigProperties;
-        private KafkaProducer<String, byte[]> producer;
-        private KafkaConsumer<String, byte[]> consumer;
+
 
         @Autowired
         public void setBridgeConfigProperties(HttpBridgeConfigProperties bridgeConfigProperties) {
@@ -36,18 +26,6 @@ public class    HttpBridge extends AbstractVerticle {
         * @param startFuture
         */
         private void bindHttpServer(Future<Void> startFuture) {
-
-                this.kafkaConfigProperties = new KafkaConfigProperties();
-
-                Properties consumer_props = new Properties();
-                consumer_props.put(ConsumerConfig.BOOTSTRAP_SERVERS_CONFIG, this.kafkaConfigProperties.getBootstrapServers());
-                consumer_props.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, this.kafkaConfigProperties.getConsumerConfig().getKeyDeserializer());
-                consumer_props.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, this.kafkaConfigProperties.getConsumerConfig().getValueDeserializer());
-                consumer_props.put(ConsumerConfig.GROUP_ID_CONFIG, "my_group");
-                consumer_props.put(ConsumerConfig.ENABLE_AUTO_COMMIT_CONFIG, this.kafkaConfigProperties.getConsumerConfig().isEnableAutoCommit());
-                consumer_props.put(ConsumerConfig.AUTO_OFFSET_RESET_CONFIG, this.kafkaConfigProperties.getConsumerConfig().getAutoOffsetReset());
-
-                this.consumer = KafkaConsumer.create(vertx, consumer_props);
 
                 this.server = vertx.createHttpServer(getServerOptions())
                         .requestHandler(request -> {
@@ -71,7 +49,7 @@ public class    HttpBridge extends AbstractVerticle {
 
                 HttpMode mode = this.bridgeConfigProperties.getEndpointConfigProperties().getMode();
                 log.info("HTTP-Kafka Bridge configured in {} mode", mode);
-                if (mode == HttpMode.SERVER) {
+                if (mode.equals(HttpMode.SERVER)) {
                         this.bindHttpServer(startFuture);
                 }else{
                         // when bridge acts as a client
@@ -82,6 +60,8 @@ public class    HttpBridge extends AbstractVerticle {
         public void stop(Future<Void> stopFuture) throws Exception {
 
                 log.info("Stopping HTTP-Kafka bridge verticle ...");
+
+                // close related connections and others
 
                 if (this.server != null) {
 
@@ -122,28 +102,7 @@ public class    HttpBridge extends AbstractVerticle {
                         new HttpSourceBridgeEndpoint(this.vertx, this.bridgeConfigProperties).handle(new HttpEndpoint(request));
                 }
                 if(request.method().equals(HttpMethod.GET)){
-                        // sink bridge endpoint
-                        String topics_query = request.getParam("topics");
-
-                        // subscribe to several topics
-                        Set<String> topics = new HashSet<String>(Arrays.asList(topics_query.split(" : ")));
-                        consumer.subscribe(topics);
-
-                        JsonObject body = new JsonObject();
-
-                        consumer.handler(record ->{
-                                JsonObject rec = new JsonObject();
-                                rec.put("key", record.key());
-                                rec.put("offset", record.offset());
-                                rec.put("value", new String(record.value()));
-                                rec.put("partition", record.partition());
-                                body.put("record",rec);
-                                Buffer buffer = body.toBuffer();
-                                HttpServerResponse response = request.response();
-                                response.setChunked(true);
-                                response.write(buffer);
-                                response.end();
-                        });
+                        new HttpSinkBridgeEndpoint<>(this.vertx, this.bridgeConfigProperties).handle(new HttpEndpoint(request));
                 }
                 else{
                         // 405 - method not allowed
