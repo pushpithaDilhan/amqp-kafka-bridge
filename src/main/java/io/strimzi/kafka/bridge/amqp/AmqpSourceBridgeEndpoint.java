@@ -19,6 +19,7 @@ package io.strimzi.kafka.bridge.amqp;
 import io.strimzi.kafka.bridge.Endpoint;
 import io.strimzi.kafka.bridge.SourceBridgeEndpoint;
 import io.strimzi.kafka.bridge.converter.MessageConverter;
+import io.vertx.core.Handler;
 import io.vertx.core.Vertx;
 import io.vertx.kafka.client.producer.KafkaProducerRecord;
 import io.vertx.kafka.client.producer.RecordMetadata;
@@ -26,13 +27,13 @@ import io.vertx.proton.ProtonDelivery;
 import io.vertx.proton.ProtonLink;
 import io.vertx.proton.ProtonQoS;
 import io.vertx.proton.ProtonReceiver;
-import org.apache.kafka.clients.producer.ProducerRecord;
 import org.apache.qpid.proton.amqp.Symbol;
 import org.apache.qpid.proton.amqp.messaging.Accepted;
 import org.apache.qpid.proton.amqp.messaging.Rejected;
 import org.apache.qpid.proton.amqp.transport.ErrorCondition;
 import org.apache.qpid.proton.message.Message;
 
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -43,7 +44,7 @@ import java.util.Map;
 public class AmqpSourceBridgeEndpoint extends SourceBridgeEndpoint {
 	
 	// converter from AMQP message to ConsumerRecord
-	private MessageConverter<String, byte[], Message> converter;
+	private MessageConverter<String, byte[], Message, Collection<Message>> converter;
 
 	// receiver link for handling incoming message
 	private Map<String, ProtonReceiver> receivers;
@@ -84,7 +85,7 @@ public class AmqpSourceBridgeEndpoint extends SourceBridgeEndpoint {
 
 		if (this.converter == null) {
 			try {
-				this.converter = (MessageConverter<String, byte[], Message>) AmqpBridge.instantiateConverter(amqpConfigProperties.getMessageConverter());
+				this.converter = (MessageConverter<String, byte[], Message, Collection<Message>>) AmqpBridge.instantiateConverter(amqpConfigProperties.getMessageConverter());
 			} catch (AmqpErrorConditionException e) {
 				AmqpBridge.detachWithError(link, e.toCondition());
 				return;
@@ -122,6 +123,11 @@ public class AmqpSourceBridgeEndpoint extends SourceBridgeEndpoint {
 		receiver.open();
 
 		this.receivers.put(receiver.getName(), receiver);
+	}
+
+	@Override
+	public void handle(Endpoint<?> endpoint, Handler<?> handler) {
+
 	}
 
 	/**
@@ -166,8 +172,7 @@ public class AmqpSourceBridgeEndpoint extends SourceBridgeEndpoint {
 				receiver.getTarget().getAddress().replace('/', '.') :
 				null;
 
-		ProducerRecord<String, byte[]> record = this.converter.toKafkaRecord(kafkaTopic, message);
-		KafkaProducerRecord<String, byte[]> krecord = KafkaProducerRecord.create(record.topic(), record.key(), record.value(), record.timestamp(), record.partition());
+		KafkaProducerRecord<String, byte[]> krecord = this.converter.toKafkaRecord(kafkaTopic, message);
 				
 		if (delivery.remotelySettled()) {
 			

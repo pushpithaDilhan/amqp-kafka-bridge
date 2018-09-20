@@ -22,19 +22,21 @@ import io.strimzi.kafka.bridge.SinkBridgeEndpoint;
 import io.strimzi.kafka.bridge.converter.MessageConverter;
 import io.strimzi.kafka.bridge.tracker.SimpleOffsetTracker;
 import io.vertx.core.AsyncResult;
+import io.vertx.core.Handler;
 import io.vertx.core.Vertx;
 import io.vertx.kafka.client.common.PartitionInfo;
 import io.vertx.kafka.client.common.TopicPartition;
+import io.vertx.kafka.client.consumer.KafkaConsumerRecord;
 import io.vertx.proton.ProtonHelper;
 import io.vertx.proton.ProtonLink;
 import io.vertx.proton.ProtonQoS;
 import io.vertx.proton.ProtonSender;
-import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.qpid.proton.amqp.Symbol;
 import org.apache.qpid.proton.amqp.messaging.Source;
 import org.apache.qpid.proton.amqp.transport.ErrorCondition;
 import org.apache.qpid.proton.message.Message;
 
+import java.util.Collection;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -50,7 +52,7 @@ public class AmqpSinkBridgeEndpoint<K, V> extends SinkBridgeEndpoint<K, V> {
 	private static final String GROUP_ID_MATCH = "/group.id/";
 	
 	// converter from ConsumerRecord to AMQP message
-	private MessageConverter<K, V, Message> converter;
+	private MessageConverter<K, V, Message, Collection<Message>> converter;
 
 	// sender link for handling outgoing message
 	private ProtonSender sender;
@@ -98,7 +100,7 @@ public class AmqpSinkBridgeEndpoint<K, V> extends SinkBridgeEndpoint<K, V> {
 		try {
 			
 			if (this.converter == null) {
-				this.converter = (MessageConverter<K, V, Message>) AmqpBridge.instantiateConverter(amqpConfigProperties.getMessageConverter());
+				this.converter = (MessageConverter<K, V, Message, Collection<Message>>) AmqpBridge.instantiateConverter(amqpConfigProperties.getMessageConverter());
 			}
 			
 			this.sender = (ProtonSender)link;
@@ -163,7 +165,7 @@ public class AmqpSinkBridgeEndpoint<K, V> extends SinkBridgeEndpoint<K, V> {
 				this.offsetTracker = new SimpleOffsetTracker(this.kafkaTopic);
 				this.qos = this.mapQoS(this.sender.getQoS());
 				
-				this.initConsumer();
+				this.initConsumer(true);
 				// Set up flow control
 				// (*before* subscribe in case we start with no credit!)
 
@@ -178,13 +180,18 @@ public class AmqpSinkBridgeEndpoint<K, V> extends SinkBridgeEndpoint<K, V> {
 				
 				this.flowCheck();
 				// Subscribe to the topic
-				this.subscribe();
+				this.subscribe(true);
 			}
 		} catch (AmqpErrorConditionException e) {
 			AmqpBridge.detachWithError(link, e.toCondition());
 			this.handleClose();
 			return;
 		}
+	}
+
+	@Override
+	public void handle(Endpoint<?> endpoint, Handler<?> handler) {
+
 	}
 
 	/**
@@ -215,7 +222,7 @@ public class AmqpSinkBridgeEndpoint<K, V> extends SinkBridgeEndpoint<K, V> {
 	 *
 	 * @param record	Kafka consumer record
 	 */
-	private void sendAmqpMessage(ConsumerRecord<K, V> record) {
+	private void sendAmqpMessage(KafkaConsumerRecord<K, V> record) {
 		int partition = record.partition();
 		long offset = record.offset();
 		String deliveryTag = partition + "_" + offset;
@@ -231,7 +238,7 @@ public class AmqpSinkBridgeEndpoint<K, V> extends SinkBridgeEndpoint<K, V> {
 			// Sender QoS unsettled (AT_LEAST_ONCE)
 			
 			// record (converted in AMQP message) is on the way ... ask to tracker to track its delivery
-			this.offsetTracker.track(partition, offset, record);
+			this.offsetTracker.track(partition, offset, record.record());
 
 			log.debug("Tracked {} - {} [{}]", record.topic(), record.partition(), record.offset());
 

@@ -18,14 +18,16 @@ package io.strimzi.kafka.bridge.amqp.converter;
 
 import io.strimzi.kafka.bridge.amqp.AmqpBridge;
 import io.strimzi.kafka.bridge.converter.MessageConverter;
-import org.apache.kafka.clients.consumer.ConsumerRecord;
-import org.apache.kafka.clients.producer.ProducerRecord;
+import io.vertx.kafka.client.consumer.KafkaConsumerRecord;
+import io.vertx.kafka.client.consumer.KafkaConsumerRecords;
+import io.vertx.kafka.client.producer.KafkaProducerRecord;
 import org.apache.qpid.proton.Proton;
 import org.apache.qpid.proton.amqp.Symbol;
 import org.apache.qpid.proton.amqp.messaging.MessageAnnotations;
 import org.apache.qpid.proton.message.Message;
 
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -34,13 +36,13 @@ import java.util.Map;
  * between Kafka record and AMQP message.
  * It passes the AMQP message as is (raw bytes) as Kafka record value and vice versa.
  */
-public class AmqpRawMessageConverter implements MessageConverter<String, byte[], Message> {
+public class AmqpRawMessageConverter implements MessageConverter<String, byte[], Message, Collection<Message>> {
 
 	// TODO : should be it configurable or based on max frame size ?
 	private static final int BUFFER_SIZE = 32768;
 	
 	@Override
-	public ProducerRecord<String, byte[]> toKafkaRecord(String kafkaTopic, Message message) {
+	public KafkaProducerRecord<String, byte[]> toKafkaRecord(String kafkaTopic, Message message) {
 		
 		Object partition = null, key = null;
 		byte[] value;
@@ -71,11 +73,12 @@ public class AmqpRawMessageConverter implements MessageConverter<String, byte[],
 		}
 		
 		// build the record for the KafkaProducer and then send it
-		return new ProducerRecord<>(topic, (Integer)partition, (String)key, value);
+                KafkaProducerRecord<String, byte[]> record = KafkaProducerRecord.create(topic, (String)key, value,(Integer) partition);
+                return record;
 	}
 
 	@Override
-	public Message toMessage(String address, ConsumerRecord<String, byte[]> record) {
+	public Message toMessage(String address, KafkaConsumerRecord<String, byte[]> record) {
 		
 		Message message = Proton.message();
 		message.setAddress(address);
@@ -93,6 +96,11 @@ public class AmqpRawMessageConverter implements MessageConverter<String, byte[],
 		message.setMessageAnnotations(messageAnnotations);
 		
 		return message;
+	}
+
+	@Override
+	public Collection<Message> toMessages(KafkaConsumerRecords<String, byte[]> records) {
+		return null;
 	}
 
 }
